@@ -53,15 +53,15 @@ for SIR_db = 15:-3:15 % 信号与干扰比（分贝）
     y = fft(y, M);
     % 算法迭代
     for j = 1:N_sym
-        % rx_fft = fft(z(:, j), M);
-        % P_signal = abs(rx_fft) .^ 2;
-        % P_interference = abs(d_hat(:, j)) .^ 2; % 若已知噪声功率，则需要加上噪声功率
-        % SINR_est(:, j) = P_signal ./ (P_interference + 1); % SINR估计，加1为噪声功率的简化处理
-        % %% 对每个符号的子载波根据SINR排序
-        % [~, sorted_indices] = sort(SINR_est, 'descend');
+        rx_fft = fft(z(:, j), M);
+        P_signal = abs(rx_fft) .^ 2;
+        P_interference = abs(d_hat(:, j)) .^ 2; % 若已知噪声功率，则需要加上噪声功率
+        SINR_est(:, j) = P_signal ./ (P_interference + 1); % SINR估计，加1为噪声功率的简化处理
+        %% 对每个符号的子载波根据SINR排序
+        [~, sorted_indices] = sort(SINR_est, 'descend');
 
         for i = 1:M
-            % idx = sorted_indices(i, j);
+            idx = sorted_indices(i, j);
             % 移除干扰估计
             z(i, j) = y(i, j) - d_hat(i, j);
             s_hat = qammod(qamdemod(z(i, j), Mod_Order, 'UnitAveragePower', true), Mod_Order, 'UnitAveragePower', true); % 解调为原始调制符号
@@ -97,10 +97,11 @@ for SIR_db = 15:-3:15 % 信号与干扰比（分贝）
     %不消除干扰
     demodulated_data = qamdemod(y, Mod_Order, 'UnitAveragePower', true);
 
-%% 评估性能
-%使用对消NBI算法
-SER = sum(sum(data ~= demodulated_data_remove)) / (M * N_sym); % 计算误符号率
-disp(['Symbol Error Rate Of remove NBI is: ', num2str(SER)]);
-%不消除干扰
-SER = sum(sum(data ~= demodulated_data)) / (M * N_sym); % 计算误符号率
-disp(['Symbol Error Rate is: ', num2str(SER)]);
+    %% 评估性能
+    %使用对消NBI算法
+    SER = sum(sum(data ~= demodulated_data_remove)) / (M * N_sym); % 计算误符号率
+    disp(['Symbol Error Rate Of remove NBI is: ', num2str(SER)]);
+    %不消除干扰
+    SER = sum(sum(data ~= demodulated_data)) / (M * N_sym); % 计算误符号率
+    disp(['Symbol Error Rate is: ', num2str(SER)]);
+end
