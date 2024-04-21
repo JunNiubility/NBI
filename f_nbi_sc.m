@@ -44,19 +44,19 @@ rx_signal = ofdm_signal_with_cp + nbi_signal;
 y = rx_signal(L_cp + 1:end, :);
 
 % F-NBI-SC算法初始化
-z = zeros(1, M); % 初始化接收信号的估计值
-d_hat = zeros(1, M); % 初始化干扰的估计值
+z = zeros(M,N_sym); % 初始化接收信号的估计值
+d_hat = zeros(M,N_sym); % 初始化干扰的估计值
 alpha = zeros(1, M); % 初始化每个子载波的alpha值
 
 % 算法迭代
 for sym_idx = 1:N_sym
     for k = 1:max_iter
         for i = 1:M
-            z(i) = y(i, sym_idx) - d_hat(i); % 移除干扰估计
-            s_hat = qamdemod(z(i), Mod_Order, 'UnitAveragePower', true); % 解调为原始调制符号
-            e = s_hat - z(i); % 误差计算
+            z(i,sym_idx) = y(i, sym_idx) - d_hat(i,sym_idx); % 移除干扰估计
+            s_hat = qammod(qamdemod(z(i), Mod_Order, 'UnitAveragePower', true),Mod_Order,'UnitAveragePower',true); % 解调为原始调制符号
+            e = s_hat - z(i,sym_idx); % 误差计算
             alpha(i) = alpha(i) + mu * e * conj(y(i, sym_idx)); % 自适应更新alpha值
-            d_hat(i) = alpha(i) * y(i, sym_idx); % 更新干扰估计值
+            d_hat(i,sym_idx) = alpha(i) * y(i, sym_idx); % 更新干扰估计值
         end
     end
 end
@@ -67,12 +67,15 @@ end
 % end
 
 % FFT转换到频域
-rx_fft = fft(y, M);
+rz_fft = fft(z, M);
+ry_fft  = fft(y,M);  
 
 % 对接收的OFDM信号进行16-QAM解调
-demodulated_data = qamdemod(rx_fft, Mod_Order, 'UnitAveragePower', true);
-
+demodulated_data_remove = qamdemod(rz_fft, Mod_Order, 'UnitAveragePower', true);
+demodulated_data = qamdemod(ry_fft, Mod_Order, 'UnitAveragePower', true);
 % 评估性能
+SER = sum(sum(data ~= demodulated_data_remove)) / (M * N_sym); % 计算误符号率
+disp(['Symbol Error Rate Of remove NBI is: ', num2str(SER)]);
 SER = sum(sum(data ~= demodulated_data)) / (M * N_sym); % 计算误符号率
 disp(['Symbol Error Rate is: ', num2str(SER)]);
 
@@ -105,7 +108,7 @@ ylabel('Amplitude');
 subplot(4, 1, 4);
 scatter(real(modulated_data(:)), imag(modulated_data(:)), 'b');
 hold on;
-scatter(real(rx_fft(:)), imag(rx_fft(:)), 'r*');
+scatter(real(ry_fft(:)), imag(ry_fft(:)), 'r*');
 legend('Original 16QAM Constellation', 'Demodulated Constellation after NBI Cancellation');
 title('Constellation Diagram Comparison');
 xlabel('In-phase Amplitude');
