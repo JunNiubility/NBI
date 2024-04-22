@@ -40,6 +40,10 @@ for SIR_db = 15:-3:0 % 信号与干扰比（分贝）
     %% 假设接收信号为OFDM信号与窄带干扰的叠加
     rx_signal = ofdm_signal_with_cp + nbi_signal;
 
+    RX_FFT = fft(rx_signal, M);
+    plot(abs(RX_FFT));
+    title('Frequency Response of OFDM Signal with NBI');
+
     %% 接收端处理
     y = rx_signal(L_cp + 1:end, :);
 
@@ -54,27 +58,29 @@ for SIR_db = 15:-3:0 % 信号与干扰比（分贝）
     y = fft(y, M);
     % 算法迭代
     for j = 1:N_sym
-        if j>1
+
+        if j > 1
             rx_fft = fft(z(:, j), M);
             P_signal = abs(rx_fft) .^ 2;
             P_interference = abs(d_hat(:, j)) .^ 2; % 若已知噪声功率，则需要加上噪声功率
             SINR_est(:, j) = P_signal ./ (P_interference + 1); % SINR估计，加1为噪声功率的简化处理
         end
+
         %% 对每个符号的子载波根据SINR排序
-        [~, sorted_indices] = sort(SINR_est, 'descend');        
+        [~, sorted_indices] = sort(SINR_est, 'descend');
 
         for i = 1:M
             idx = sorted_indices(i, j);
             % 移除干扰估计
             z(idx, j) = y(idx, j) - d_hat(i, j);
-            s_hat = (qamdemod(z(idx, 1:j), Mod_Order, 'UnitAveragePower', true)); % 解调为原始调制符号
+            s_hat = qammod(qamdemod(z(idx, 1:j), Mod_Order, 'UnitAveragePower', true), Mod_Order); % 解调为原始调制符号
             % 计算干扰残差
-            delta_d(i, j) = mean(y(idx, 1:j) - s_hat);
+            delta_d(i, j) = median(y(idx, 1:j) - s_hat);
             % 更新干扰估计
             if i < M
                 % 计算R_d_k和q_k参数
                 R = xcorr(delta_d(1:i, j), conj(delta_d(1:i, j)'), i - 1);
-                q = xcorr(delta_d(1:i, j), y(sorted_indices(i+1, j), j), i - 1);
+                q = xcorr(delta_d(1:i, j), y(sorted_indices(i + 1, j), j), i - 1);
                 R_d_k = toeplitz(R(i:end));
                 q_k = q(i:end);
                 % 根据alpha_k = R_d_k^-1 * q_k公式来更新滤波器系数alpha
